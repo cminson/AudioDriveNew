@@ -48,13 +48,13 @@ var RecordingActive: Bool! = false
 var DOCUMENTS_URL : URL!
 var DOCUMENTS_PATH = ""
 
+var TheTimer: Timer!
 
 
 
 enum RecordingState {                   // states of the recording player
-    case INITIAL
     case RECORDING
-    case FINISHED
+    case STOPPED
 }
 
 
@@ -62,7 +62,7 @@ struct RecordingView: View {
     
     @State private var selection: String?  = ""
     @State private var elapsedTime: Int = 0
-    @State private var recordingState: RecordingState = .INITIAL
+    @State private var recordingState: RecordingState = .STOPPED
     
     init() {
                 
@@ -100,11 +100,18 @@ struct RecordingView: View {
                 Spacer().frame(height: 20)
 
                 Button(action: {
-                    // todo
+                    if self.recordingState == .STOPPED {
+                        self.prepareForRecording()
+                        self.startRecording()
+                        self.recordingState = .RECORDING
+                    } else {
+                        self.recordingState = .STOPPED
+                        self.stopRecording()
+                    }
                 })
                 {
                     //Image(systemName: self.stateTalkPlayer == .PLAYING ? "pause.fill" : "play.fill")
-                    Image(systemName: "play.fill")
+                    Image(systemName: recordingState == .STOPPED ? "play.fill" : "pause.fill")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(height: 100)
@@ -165,17 +172,45 @@ struct RecordingView: View {
         var displayState: String
         
         switch recordingState {
-        case .INITIAL:
+        case .STOPPED:
             displayState = "Start Recording"
         case .RECORDING:
             displayState = "Recording"
-        case .FINISHED:
-            displayState = "Start Recording"
         }
        
         return displayState
     }
     
+    
+    func prepareForRecording() {
+        
+        activateRecordingUI()
+        
+        var fileExists: Bool
+        var audioFileName, audioFilePath : String
+        
+        let fileManager = FileManager.default
+        repeat {
+            let format = DateFormatter()
+            format.dateFormat = "yyMMdd.HHmmss"
+            let formattedDate = format.string(from: Date())
+            
+            audioFileName = AUDIO_PREFIX + formattedDate +  MP3_AUDIO_SUFFIX
+            audioFilePath = DOCUMENTS_URL.appendingPathComponent(audioFileName).path
+            fileExists = fileManager.fileExists(atPath: audioFilePath)
+        } while (fileExists == true)
+        
+        AudioFileName = audioFileName
+        AudioFilePath = audioFilePath
+        let vaildateNameString =  ConfigUploadFolder.replacingOccurrences(of: " ", with: "")
+
+        AudioTranscriptName = AudioFileName.replacingOccurrences(of: MP3_AUDIO_SUFFIX, with: TRANSCRIPT_SUFFIX)
+        AudioTranscriptPath = AudioFilePath.replacingOccurrences(of: MP3_AUDIO_SUFFIX, with: TRANSCRIPT_SUFFIX)
+
+        
+        ActiveSet.insert(audioFileName)
+        print("Inserting into Set \(audioFileName)")
+    }
     
     // record the MP3.  Painfully use lame to tap into the byte stream and perform the encoding
     func startRecording() {
